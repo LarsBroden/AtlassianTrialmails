@@ -1,7 +1,9 @@
 import { fetchEvaluationLicenses, classifyTrial, type TrialLicense, type RejectReason } from "./marketplace";
 import {
   hasBeenSent,
-  markSent,
+  claimSendLock,
+  confirmSent,
+  releaseSendLock,
   hasEmailBeenSent,
   markEmailSent,
   getWatermark,
@@ -20,6 +22,7 @@ export interface RunSummary {
   attempted: number;
   sent: number;
   failed: number;
+  watermark: { from: string | null; to: string | null };
   results: Array<{
     licenseId: string;
     email: string;
@@ -35,6 +38,13 @@ function firstName(fullName: string): string {
   if (!trimmed) return "";
   const i = trimmed.search(/\s+/);
   return i < 0 ? trimmed : trimmed.slice(0, i);
+}
+
+function isoDateMinusOneDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export async function runWelcomeTrials(): Promise<RunSummary> {
@@ -58,16 +68,28 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
     attempted: 0,
     sent: 0,
     failed: 0,
+    watermark: { from: watermark, to: watermark },
     results: [],
   };
 
-  let maxSeenDate = watermark ?? "";
+  let maxSuccessDate = watermark ?? "";
+  let earliestFailedDate: string | undefined;
+
+  const noteSuccess = (license: TrialLicense) => {
+    if (license.lastUpdated && license.lastUpdated > maxSuccessDate) {
+      maxSuccessDate = license.lastUpdated;
+    }
+  };
+  const noteFailure = (license: TrialLicense) => {
+    if (
+      license.lastUpdated &&
+      (!earliestFailedDate || license.lastUpdated < earliestFailedDate)
+    ) {
+      earliestFailedDate = license.lastUpdated;
+    }
+  };
 
   for (const license of licenses) {
-    if (license.lastUpdated && license.lastUpdated > maxSeenDate) {
-      maxSeenDate = license.lastUpdated;
-    }
-
     const classification = classifyTrial(license, { lookbackDays, now });
     if (!classification.ok) {
       summary.rejected++;
@@ -80,21 +102,42 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
         status: "rejected",
         reason: classification.reason,
       });
+      noteSuccess(license);
       continue;
     }
 
-    if (await hasBeenSent(license.addonLicenseId)) {
-      summary.alreadySent++;
-      summary.results.push({
-        licenseId: license.addonLicenseId,
-        email: license.contactEmail,
-        company: license.company,
-        status: "already-sent",
-      });
-      continue;
+    // In dry-run we want a read-only check; in live we want an atomic claim
+    // so two overlapping runs can't both send the same license.
+    let claimed = false;
+    if (dryRun) {
+      if (await hasBeenSent(license.addonLicenseId)) {
+        summary.alreadySent++;
+        summary.results.push({
+          licenseId: license.addonLicenseId,
+          email: license.contactEmail,
+          company: license.company,
+          status: "already-sent",
+        });
+        noteSuccess(license);
+        continue;
+      }
+    } else {
+      claimed = await claimSendLock(license.addonLicenseId);
+      if (!claimed) {
+        summary.alreadySent++;
+        summary.results.push({
+          licenseId: license.addonLicenseId,
+          email: license.contactEmail,
+          company: license.company,
+          status: "already-sent",
+        });
+        noteSuccess(license);
+        continue;
+      }
     }
 
     if (await hasEmailBeenSent(license.appKey, license.contactEmail)) {
+      if (claimed) await releaseSendLock(license.addonLicenseId);
       summary.alreadySent++;
       summary.results.push({
         licenseId: license.addonLicenseId,
@@ -102,6 +145,7 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
         company: license.company,
         status: "already-emailed",
       });
+      noteSuccess(license);
       continue;
     }
 
@@ -109,7 +153,7 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
     try {
       await sendOneWelcome(license, dryRun);
       if (!dryRun) {
-        await markSent(license.addonLicenseId);
+        await confirmSent(license.addonLicenseId);
         await markEmailSent(license.appKey, license.contactEmail);
       }
       summary.sent++;
@@ -119,7 +163,9 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
         company: license.company,
         status: dryRun ? "dry-run" : "sent",
       });
+      noteSuccess(license);
     } catch (err) {
+      if (claimed) await releaseSendLock(license.addonLicenseId);
       summary.failed++;
       summary.results.push({
         licenseId: license.addonLicenseId,
@@ -128,11 +174,21 @@ export async function runWelcomeTrials(): Promise<RunSummary> {
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
+      noteFailure(license);
     }
   }
 
-  if (!dryRun && maxSeenDate) {
-    await setWatermark(maxSeenDate);
+  // Compute the new watermark. Never advance past any failed license so a
+  // transient failure gets retried on the next run instead of being lost.
+  let newWatermark = maxSuccessDate;
+  if (earliestFailedDate) {
+    const safeBoundary = isoDateMinusOneDay(earliestFailedDate);
+    if (newWatermark > safeBoundary) newWatermark = safeBoundary;
+  }
+
+  if (!dryRun && newWatermark && newWatermark !== watermark) {
+    await setWatermark(newWatermark);
+    summary.watermark.to = newWatermark;
   }
 
   return summary;
