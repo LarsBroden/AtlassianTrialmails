@@ -84,3 +84,9 @@ User picked **B first** to avoid Forge app modifications on the first iteration.
 **Choice:** Single source of truth for the email template is the file `emails/welcome-preview.html` with `{{placeholder}}` syntax. `lib/template.ts` reads it via `readFileSync` at module load.
 **Alternative:** Inline the HTML as a TypeScript string constant.
 **Reasoning:** Keeps the file viewable as a static HTML preview (placeholders show as literal text) for design iteration, while the same file is what gets sent to real recipients. Configured `outputFileTracingIncludes` in [next.config.mjs](next.config.mjs) so Vercel bundles it into the serverless function.
+
+## D13 — Deployment intentionally deferred (no prod, no staging)
+
+**Choice as of 2026-05-13:** The project remains pre-deployment. No Vercel project linked, no Azure AD app registered, no Upstash database provisioned, no real Marketplace API token used. Code lives on GitHub `main`; that's the only artefact.
+**Reasoning:** Explicit user direction — "I do not want the solution to go to production just yet." Reasons not enumerated; could be timing, business prioritisation, or wanting more review of the architecture before committing real customer data to the system.
+**Implication for future sessions:** do **not** suggest "next step is to follow SETUP.md" or frame the user-side setup checklist as a backlog to burn down. Frame deployment actions as "when you're ready" — never as the current trajectory. Refinement work on the codebase continues to be fine. Production-touching actions wait for explicit go-ahead.

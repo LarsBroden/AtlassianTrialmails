@@ -6,7 +6,7 @@ If you (or a future Claude session) are resuming work on this project, start her
 
 ## TL;DR
 
-The code is built and tested. **Nothing is deployed yet** — the user has not completed the one-time setup steps in [SETUP.md](SETUP.md). The natural next action is to walk through those setup steps, get a first `DRY_RUN=true` cron tick against real Marketplace data, then flip `DRY_RUN=false` once filter behaviour is verified.
+The code is built and tested. **Deployment is intentionally deferred** — Lars has explicitly held the project at the pre-deployment stage. No Vercel project linked, no Azure AD app registered, no Upstash database provisioned, no real Marketplace API token in use. The repo on `main` is the artefact; nothing touches production. When Lars chooses to move forward, [SETUP.md](SETUP.md) walks the path. **Do not push toward deployment unless explicitly asked.**
 
 ## What's built and committed
 
@@ -26,9 +26,9 @@ The code is built and tested. **Nothing is deployed yet** — the user has not c
 | Tests | ✅ 48 passing | `npm test` |
 | Production build | ✅ Clean | `npm run build` |
 
-## What's NOT done yet (the bottleneck)
+## Deployment checklist (deliberately not done)
 
-These are user-side actions in [SETUP.md](SETUP.md). Until done, the system can fetch nothing real and send nothing.
+These are the user-side actions in [SETUP.md](SETUP.md), to be done **only when Lars decides to deploy**. Not a backlog — a held checklist. Until then, the project intentionally remains in pre-deployment state.
 
 - [ ] Atlassian Marketplace API token created
 - [ ] Azure AD app registration ("Bulk Clone Trial Mailer") with `Mail.Send` application permission + admin consent
@@ -69,6 +69,7 @@ From the review at [DECISIONS.md D6](DECISIONS.md)-era. These were acknowledged 
 
 ## Resume hints for future sessions
 
+- **Deployment is on hold by explicit user direction.** Do not frame "next steps" as setup/deployment actions. Code refinement, doc updates, design iteration are all fine; touching Vercel / Azure / Upstash / real Marketplace API is not, unless Lars explicitly asks.
 - All architectural reasoning is in [DECISIONS.md](DECISIONS.md). Don't re-derive choices that are documented there; if you disagree, append a new decision rather than rewriting old ones.
 - The user prefers concise responses with concrete recommendations and tradeoffs, not menus of options. They make decisions quickly (numbered answers) and push back hard when something isn't right (good signal — listen).
 - Email voice and sender domain are settled (team voice, `lars.broden@lbconsultinggroup.org`) and shouldn't be revisited unless explicitly asked.
