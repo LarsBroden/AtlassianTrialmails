@@ -31,6 +31,7 @@ export const env = {
   // Operational
   dryRun: () => optional("DRY_RUN", "true").toLowerCase() === "true",
   cronSecret: () => optional("CRON_SECRET"),
+  forgeWebhookSecret: () => optional("FORGE_WEBHOOK_SECRET"),
   newTrialLookbackDays: () => {
     const v = parseInt(optional("NEW_TRIAL_LOOKBACK_DAYS", "7"), 10);
     return Number.isFinite(v) && v > 0 ? v : 7;

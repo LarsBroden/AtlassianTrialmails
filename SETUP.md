@@ -1,8 +1,14 @@
 # Setup — Trial Welcome Automation
 
-One-time setup to wire up the cron job that watches the Atlassian Marketplace for new trial activations and emails each new evaluator from `lars.broden@lbconsultinggroup.org`.
+One-time setup to wire up the welcome email pipeline. Two layers:
 
-Estimated time: 25–30 minutes.
+1. **Trigger-based (primary):** the Bulk Clone Professional Forge app fires its
+   `installed` lifecycle event when a Jira admin starts a trial. A 60s delayed
+   Forge queue then POSTs to a Vercel webhook, which sends the welcome email.
+   End-to-end latency: ~60–90 seconds from install to inbox.
+2. **Daily cron (safety net):** catches anything the trigger missed.
+
+Estimated time: 30–40 minutes.
 
 ---
 
@@ -129,6 +135,7 @@ npx vercel env add CALENDAR_URL                   # your Calendly link
 npx vercel env add DOCS_URL                       # docs link
 npx vercel env add QUICKSTART_URL                 # quickstart video link
 npx vercel env add NEW_TRIAL_LOOKBACK_DAYS        # value: 7 (only act on trials started in last N days)
+npx vercel env add FORGE_WEBHOOK_SECRET           # value: long random string (shared with the Forge app)
 ```
 
 Then deploy:
@@ -214,6 +221,30 @@ curl "http://localhost:3000/api/debug/preview-template" -o preview.html && start
 `npm test` runs the unit tests for the template and Marketplace parsing.
 
 ---
+
+## 7. Forge app integration (the trigger layer)
+
+This is what makes the welcome email arrive within ~90 seconds of install instead of waiting for the next daily cron run. Done inside the **Bulk Clone Professional Forge app's** repo, not this one.
+
+1. Copy `bulk-clone-forge-snippets/` contents into the Forge app repo:
+   - `manifest-additions.yaml` → merge into the Forge app's `manifest.yml`
+   - `src/welcome-trigger.ts` → drop in next to existing handlers
+2. Install the dependency: `npm install @forge/events`
+3. Replace the placeholder `https://your-vercel-app.vercel.app` in `permissions.external-fetch.backend` with your actual Vercel domain
+4. Set Forge environment variables (per env — at minimum `production`):
+   ```
+   forge variables set --encrypt --environment production WELCOME_WEBHOOK_URL    https://<your-vercel-app>.vercel.app/api/lifecycle/installed
+   forge variables set --encrypt --environment production WELCOME_WEBHOOK_SECRET <same value as FORGE_WEBHOOK_SECRET on Vercel>
+   ```
+5. Deploy: `forge deploy --environment production` then `forge install --upgrade --environment production`
+
+**How it behaves:**
+- `avi:forge:installed:app` fires on any install. Non-production environments are skipped automatically (see `handleInstall` — `environmentType` check).
+- The trigger enqueues a 60s-delayed task. After 60s, the consumer POSTs to your Vercel webhook with `Authorization: Bearer $WELCOME_WEBHOOK_SECRET`.
+- Your Vercel `/api/lifecycle/installed` endpoint validates the secret, logs the install context, and runs the same `runWelcomeTrials()` pipeline the daily cron uses — so all the same filters, dedupe, and dry-run safeguards apply.
+- If Forge's queue retry kicks in (HTTP non-2xx response), the Vercel side is idempotent — the per-license atomic claim prevents double-sends.
+
+**Testing without spamming:** deploy and install to a Forge `development` environment. The `environmentType` check short-circuits the trigger. As a second safety net, keep `DRY_RUN=true` on Vercel until you've watched a few real install events flow through.
 
 ## Operational notes
 

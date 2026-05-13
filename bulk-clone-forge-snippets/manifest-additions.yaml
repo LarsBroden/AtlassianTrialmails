@@ -1,0 +1,32 @@
+# Add these entries to the Bulk Clone Professional Forge app's manifest.yml.
+# Don't replace the file — merge each section into the existing one.
+
+modules:
+  trigger:
+    - key: trial-welcome-install-trigger
+      function: handle-install
+      events:
+        - avi:forge:installed:app
+
+  function:
+    - key: handle-install
+      handler: welcome-trigger.handleInstall
+    - key: welcome-consumer-fn
+      handler: welcome-trigger.welcomeConsumer
+
+  consumer:
+    - key: trial-welcome-queue
+      queue: trial-welcome
+      resolver:
+        function: welcome-consumer-fn
+
+permissions:
+  # Replace the placeholder with your actual Vercel deployment domain.
+  # Forge requires explicit allow-listing of any external host the app calls.
+  external-fetch:
+    backend:
+      - https://your-vercel-app.vercel.app
+
+# Environment variables (set via `forge variables set --encrypt ...`):
+#   WELCOME_WEBHOOK_URL    — https://<your-vercel-app>.vercel.app/api/lifecycle/installed
+#   WELCOME_WEBHOOK_SECRET — same value as FORGE_WEBHOOK_SECRET on Vercel
