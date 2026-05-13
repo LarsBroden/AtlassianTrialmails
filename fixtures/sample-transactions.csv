@@ -1,0 +1,13 @@
+transactionId,addonKey,hosting,tier,licenseType,status,maintenanceStartDate,maintenanceEndDate,billingPeriod,technicalContactEmail,technicalContactName,technicalContactCompany,billingContactEmail,billingContactName,billingContactCompany,country
+AT-T01,com.lbcg.bulkclone,Cloud,25 Users,COMMERCIAL,Active,2025-06-01,2027-06-01,Annual,alice@acmecorp.com,Alice Johnson,Acme Corp,billing@acmecorp.com,Bob Billing,Acme Corp,US
+AT-T02,com.lbcg.bulkclone,Cloud,100 Users,COMMERCIAL,Active,2025-09-15,2027-09-15,Annual,partner@adaptavist.com,Sam Partner,Adaptavist,partner@adaptavist.com,Sam Partner,Adaptavist,UK
+AT-T03,com.lbcg.bulkclone,Cloud,50 Users,COMMERCIAL,,2022-01-01,2024-01-01,Annual,old@expired.com,Old Customer,Expired Co,old@expired.com,Old Customer,Expired Co,DE
+AT-T04,com.lbcg.bulkclone,Cloud,10 Users,COMMERCIAL,,2026-01-01,2027-01-01,Annual,future@goodco.com,Future User,Good Co,future@goodco.com,Future User,Good Co,CA
+AT-T05,com.lbcg.bulkclone,Data Center,500 Users,COMMERCIAL,Active,2025-03-01,2027-03-01,Annual,dc@datacenter.com,DC User,DataCenter Co,dc@datacenter.com,DC User,DataCenter Co,US
+AT-T06,com.lbcg.bulkclone,Cloud,25 Users,COMMERCIAL,Active,2025-04-10,2027-04-10,Annual,sara@acme.com,Sara Smith,"Acme, Inc",sara@acme.com,Sara Smith,"Acme, Inc",AU
+AT-T07,com.lbcg.bulkclone,Cloud,25 Users,COMMERCIAL,Active,2025-07-01,2027-07-01,Annual,ALICE@acmecorp.com,Alice Johnson,Acme Corp,alice@acmecorp.com,Alice Johnson,Acme Corp,US
+AT-T08,com.lbcg.bulkclone,Cloud,250 Users,COMMERCIAL,Active,2025-08-20,2027-08-20,Annual,techlead@bigcorp.com,Terry Lead,BigCorp,ap@bigcorp.com,Anna Payable,BigCorp,US
+AT-T09,com.lbcg.bulkclone,Cloud,10 Users,COMMERCIAL,,,,Annual,nodate@mystery.com,Mystery Person,Mystery Co,nodate@mystery.com,Mystery Person,Mystery Co,FR
+AT-T10,com.lbcg.bulkclone,Server,500 Users,COMMERCIAL,Active,2024-01-01,2025-01-01,Annual,server@onprem.com,Server Admin,OnPrem Co,server@onprem.com,Server Admin,OnPrem Co,JP
+AT-T11,com.lbcg.bulkclone,Cloud,10 Users,COMMERCIAL,Active,2026-02-01,2027-02-01,Annual,cher@singlenamecorp.com,Cher,SingleNameCorp,cher@singlenamecorp.com,Cher,SingleNameCorp,US
+AT-T12,com.lbcg.bulkclone,Cloud,25 Users,COMMERCIAL,Cancelled,2024-05-01,2025-05-01,Annual,inactive@cancelled.com,Inactive User,Cancelled Co,inactive@cancelled.com,Inactive User,Cancelled Co,NL
