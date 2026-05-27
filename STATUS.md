@@ -1,16 +1,29 @@
 # Status & Resume Notes
 
-**Last updated:** 2026-05-27
+**Last updated:** 2026-05-27 (resumed same day, paused mid-deployment)
 
 If you (or a future Claude session) are resuming work on this project, start here.
 
 ## TL;DR
 
-**Local rehearsal complete. Vercel deployment still pending.**
+**Local rehearsal complete. Vercel Hobby deployment IN PROGRESS — paused at git email blocker.**
 
-Lars ran the full trial-welcome pipeline locally on 2026-05-27 against his real Marketplace API token (vendor 38407) in `DRY_RUN=true` mode. The rehearsal revealed two filter gaps (`@bugcrowdninja.com` bug-bounty researchers and `bugbounty-test-*` / `sandbox` / `*-test` / `*-internal` tenant names) which have now been tightened in code and tests. He also sent himself the day-1 template via Outlook desktop to verify rendering — the email renders well in Gmail / web Outlook / mobile / Mac, and renders degraded but readable in Outlook Classic (D19 in DECISIONS.md explains why and the accepted trade-off — no action taken).
+### Current blocker (Vercel deployment):
+Vercel blocks deployment when commit author email doesn't match a GitHub account on the team. Fixed git config to `lars.broden@enterprisemovement.com` (correct GitHub account email). Latest commit `76641e1` pushed with correct author email — awaiting Vercel webhook to pick it up and auto-deploy. Once that deploys successfully, move to Task #5 (dry-run verification).
 
-**Next phase when Lars is ready:** the Vercel Hobby deployment from [SETUP.md](SETUP.md). Code is fully verified and ready. No further changes needed before the Azure / Upstash / DNS / Vercel env setup begins.
+### What's been completed in this session (2026-05-27 afternoon):
+- ✅ Linked project to Vercel (project-005vw)
+- ✅ Set all Vercel env vars: Marketplace creds, CC_EMAIL, DRY_RUN, NEW_TRIAL_LOOKBACK_DAYS, CRON_SECRET, FORGE_WEBHOOK_SECRET
+- ✅ Connected Upstash Redis (auto-created vars with wrong prefix; manually added UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN with correct values)
+- ✅ Fixed git config email to match GitHub account
+- ⏸️ Waiting on Vercel to deploy commit `76641e1` with correct author email
+
+### Next steps (when resuming):
+1. Check Vercel Deployments tab — if `76641e1` deployed successfully, skip to step 3
+2. If still blocked: refresh Vercel page, wait 30s, check again
+3. Once deployed: verify dry-run via `curl https://project-005vw.vercel.app/api/cron/welcome-trials?secret=$CRON_SECRET`
+4. Update STATUS.md to mark Vercel deployment done
+5. Phase 3 deferred: Azure AD (§2), DNS (§3), flip DRY_RUN=false
 
 ## What's built and committed
 
