@@ -23,6 +23,7 @@ export const env = {
   azureClientSecret: () => required("AZURE_CLIENT_SECRET"),
   graphSenderUserId: () => required("GRAPH_SENDER_USER_ID"),
   graphReplyToEmail: () => optional("GRAPH_REPLY_TO_EMAIL"),
+  ccEmail: () => optional("CC_EMAIL"),
 
   // Upstash Redis (set automatically by Vercel Marketplace integration)
   upstashUrl: () => optional("UPSTASH_REDIS_REST_URL"),

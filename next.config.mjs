@@ -5,6 +5,7 @@ const nextConfig = {
     outputFileTracingIncludes: {
       "/api/cron/welcome-trials": ["./emails/**/*"],
       "/api/debug/preview-template": ["./emails/**/*"],
+      "/api/lifecycle/installed": ["./emails/**/*"],
     },
   },
 };

@@ -1,75 +1,98 @@
 import { describe, expect, it } from "vitest";
-import { renderHtml, renderText, SUBJECT } from "../lib/template";
+import { renderHtml, renderText, subjectFor } from "../lib/template";
 
-const baseInput = {
-  firstName: "Sara",
-  company: "Acme Corp",
-  trialEndDate: "2026-06-12",
-};
+describe("renderHtml('day1')", () => {
+  const html = renderHtml("day1");
 
-describe("renderHtml", () => {
-  it("substitutes all known placeholders", () => {
-    const html = renderHtml(baseInput);
-    expect(html).not.toMatch(/\{\{firstName\}\}/);
-    expect(html).not.toMatch(/\{\{company\}\}/);
-    expect(html).not.toMatch(/\{\{trialEndDate\}\}/);
-    expect(html).toContain("Sara");
-    expect(html).toContain("Acme Corp");
+  it("returns a non-trivial HTML document", () => {
+    expect(html.length).toBeGreaterThan(2000);
+    expect(html).toMatch(/<!DOCTYPE html>/i);
   });
 
-  it("formats the trial end date as a long-form English date", () => {
-    const html = renderHtml(baseInput);
-    expect(html).toContain("June 12, 2026");
+  it("contains the welcome hero copy and the trial-started badge", () => {
+    expect(html).toContain("Welcome — Trial Started");
+    expect(html).toContain("let's get you cloning");
   });
 
-  it("escapes HTML in personalization fields", () => {
-    const html = renderHtml({
-      ...baseInput,
-      company: "<script>alert(1)</script>",
-    });
-    expect(html).not.toContain("<script>alert(1)</script>");
-    expect(html).toContain("&lt;script&gt;");
+  it("identifies Lars as Product Manager (the new founder-as-PM voice)", () => {
+    expect(html).toContain("Lars Brodén");
+    expect(html).toContain("Product Manager");
   });
 
-  it("falls back to safe defaults when firstName/company are missing", () => {
-    const html = renderHtml({ ...baseInput, firstName: "", company: "" });
-    expect(html).toContain("Welcome, there.");
-    expect(html).toContain("your team");
+  it("links to the docs, video tutorials, migration guide, and release notes", () => {
+    expect(html).toContain("https://www.lbconsultinggroup.org/bulk-clone-cloud-solution/");
+    expect(html).toContain("https://www.lbconsultinggroup.org/bulk-clone-professional-cloud-video-tutorials/");
+    expect(html).toContain("https://www.lbconsultinggroup.org/bulk-clone-proffessional-for-cloud-migration-plan/");
+    expect(html).toContain("https://www.lbconsultinggroup.org/release-notes-bulk-clone-professional-cloud/");
   });
 
-  it("renders the team-voice copy, not founder-voice", () => {
-    const html = renderHtml(baseInput);
-    expect(html).toContain("We're the Bulk Clone team");
-    expect(html).toContain("The Bulk Clone team");
-    expect(html).not.toContain("I'm Lars");
-    expect(html).not.toContain("I read every email");
+  it("links to the support portal and the Marketplace listing for app 1213028", () => {
+    expect(html).toContain("https://bulkclone-support.atlassian.net/servicedesk/customer/portal/1");
+    expect(html).toContain("marketplace.atlassian.com/apps/1213028");
   });
 
-  it("routes the footer domain to lbconsultinggroup.org", () => {
-    const html = renderHtml(baseInput);
-    expect(html).toContain("lbconsultinggroup.org");
-    expect(html).not.toContain("enterprisemovement.com");
+  it("includes the LB Consulting Group AB Stockholm footer", () => {
+    expect(html).toContain("LB Consulting Group AB");
+    expect(html).toContain("Valhallavägen 80");
+  });
+
+  it("contains no leftover handlebars-style placeholders", () => {
+    expect(html).not.toMatch(/\{\{\w+\}\}/);
+  });
+});
+
+describe("renderHtml('day9')", () => {
+  const html = renderHtml("day9");
+
+  it("returns a non-trivial HTML document", () => {
+    expect(html.length).toBeGreaterThan(2000);
+    expect(html).toMatch(/<!DOCTYPE html>/i);
+  });
+
+  it("opens with the Day-9 badge and the trial-going question", () => {
+    expect(html).toContain("Day 9 of Your Trial");
+    expect(html).toContain("21 Days Remaining");
+    expect(html).toContain("How is your trial");
+  });
+
+  it("includes the day-9 check-in checklist", () => {
+    expect(html).toContain("A few things worth checking at day 9");
+    expect(html).toContain("Have you tried cloning a full Epic");
+  });
+
+  it("re-surfaces docs, videos, and support portal links", () => {
+    expect(html).toContain("https://www.lbconsultinggroup.org/bulk-clone-cloud-solution/");
+    expect(html).toContain("https://bulkclone-support.atlassian.net/servicedesk/customer/portal/1");
+  });
+
+  it("contains no leftover handlebars-style placeholders", () => {
+    expect(html).not.toMatch(/\{\{\w+\}\}/);
   });
 });
 
 describe("renderText", () => {
-  it("produces a plain-text version with the same key facts", () => {
-    const text = renderText(baseInput);
-    expect(text).toContain("Hi Sara");
-    expect(text).toContain("Acme Corp");
-    expect(text).toContain("June 12, 2026");
-    expect(text).toContain("The Bulk Clone team");
+  it("day1 plain-text version covers the key facts and signature", () => {
+    const text = renderText("day1");
+    expect(text).toContain("Welcome to Bulk Clone Professional");
+    expect(text).toContain("Lars Brodén");
+    expect(text).toContain("Product Manager");
+    expect(text).toContain("https://www.lbconsultinggroup.org/bulk-clone-cloud-solution/");
   });
 
-  it("uses fallback greeting when firstName is blank", () => {
-    const text = renderText({ ...baseInput, firstName: "" });
-    expect(text).toContain("Hi there");
+  it("day9 plain-text version mentions the check-in framing and 21 days remaining", () => {
+    const text = renderText("day9");
+    expect(text).toContain("Day 9");
+    expect(text).toContain("21 days remaining");
+    expect(text).toContain("Lars Brodén");
   });
 });
 
-describe("SUBJECT", () => {
-  it("is non-empty and references the product", () => {
-    expect(SUBJECT.length).toBeGreaterThan(10);
-    expect(SUBJECT).toContain("Bulk Clone Professional");
+describe("subjectFor", () => {
+  it("day1 subject references the welcome", () => {
+    expect(subjectFor("day1")).toContain("Welcome");
+    expect(subjectFor("day1")).toContain("Bulk Clone Professional");
+  });
+  it("day9 subject signals the check-in", () => {
+    expect(subjectFor("day9")).toContain("Day 9");
   });
 });

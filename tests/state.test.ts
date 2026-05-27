@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetClientForTests,
+  claimDay9Lock,
   claimSendLock,
+  confirmDay9Sent,
   confirmSent,
   hasBeenSent,
+  hasDay9BeenSent,
   hasEmailBeenSent,
   markEmailSent,
+  releaseDay9Lock,
   releaseSendLock,
 } from "../lib/state";
 
@@ -36,6 +40,35 @@ describe("claimSendLock — atomic per-license claim", () => {
     expect(await hasBeenSent("SEN-L4")).toBe(false);
     await claimSendLock("SEN-L4");
     expect(await hasBeenSent("SEN-L4")).toBe(true);
+  });
+});
+
+describe("claimDay9Lock — atomic per-license day-9 claim", () => {
+  it("returns true on first claim, false on a concurrent second claim", async () => {
+    expect(await claimDay9Lock("SEN-L1")).toBe(true);
+    expect(await claimDay9Lock("SEN-L1")).toBe(false);
+  });
+
+  it("releases day-9 claim so a later run can retry", async () => {
+    expect(await claimDay9Lock("SEN-L2")).toBe(true);
+    await releaseDay9Lock("SEN-L2");
+    expect(await claimDay9Lock("SEN-L2")).toBe(true);
+  });
+
+  it("confirmDay9Sent makes the claim permanent", async () => {
+    expect(await claimDay9Lock("SEN-L3")).toBe(true);
+    await confirmDay9Sent("SEN-L3");
+    expect(await claimDay9Lock("SEN-L3")).toBe(false);
+    expect(await hasDay9BeenSent("SEN-L3")).toBe(true);
+  });
+
+  it("day-1 and day-9 dedupe keys are independent", async () => {
+    await claimSendLock("SEN-L4");
+    await confirmSent("SEN-L4");
+    expect(await hasBeenSent("SEN-L4")).toBe(true);
+    // Day-9 lock on the same license should still be free
+    expect(await hasDay9BeenSent("SEN-L4")).toBe(false);
+    expect(await claimDay9Lock("SEN-L4")).toBe(true);
   });
 });
 

@@ -90,3 +90,30 @@ User picked **B first** to avoid Forge app modifications on the first iteration.
 **Choice as of 2026-05-13:** The project remains pre-deployment. No Vercel project linked, no Azure AD app registered, no Upstash database provisioned, no real Marketplace API token used. Code lives on GitHub `main`; that's the only artefact.
 **Reasoning:** Explicit user direction — "I do not want the solution to go to production just yet." Reasons not enumerated; could be timing, business prioritisation, or wanting more review of the architecture before committing real customer data to the system.
 **Implication for future sessions:** do **not** suggest "next step is to follow SETUP.md" or frame the user-side setup checklist as a backlog to burn down. Frame deployment actions as "when you're ready" — never as the current trajectory. Refinement work on the codebase continues to be fine. Production-touching actions wait for explicit go-ahead.
+
+## D14 — Email templates: founder-as-PM voice, fully static HTML, two-email cadence
+
+**Choice (supersedes D3):** The welcome email and a new day-9 check-in email are both static HTML files supplied by Lars and dropped into `emails/`. No `{{placeholder}}` substitution at all — the templates are fully self-contained. Voice is "we" for the brand, with **"A personal note from Lars Brodén, Product Manager"** blocks and a signature reading "Lars Brodén / Product Manager — Bulk Clone Professional for Jira / LB Consulting Group". This is a deliberate refinement of D3 (which had moved the voice from founder-led to team-led) — Lars is back as the human face of the brand without dropping the "we" framing.
+**Files:** `emails/welcome-preview.html` (day-1, replaced wholesale) and `emails/day9-followup.html` (new). Both contain inline base64 product logos, full resource cards, trust block, support portal CTA, and the LB Consulting Group AB Stockholm footer.
+**Cadence:** day-1 fires when a new trial is detected; day-9 fires when `maintenanceStartDate + 9 days <= today` AND day-1 was previously sent (continuity gate — no check-in without a welcome first).
+**Consequence on the renderer:** `lib/template.ts` simplifies to a static file read + per-template subject + plain-text fallback. The previous `RenderInput` type with firstName/company/trialEndDate is gone — recipients are addressed generically in body copy.
+
+## D15 — Cron schedule = */5 * * * * (requires Vercel Pro)
+
+**Choice:** `vercel.json` declares `*/5 * * * *` as the source-of-truth schedule.
+**Reasoning:** Lars asked for 5-minute polling. On the free Hobby tier this clause is silently capped to daily by Vercel — the cron will still only fire once per day until Vercel Pro is enabled. Putting 5-min in source code means no change is needed at upgrade time.
+**Trade-off:** the day-9 send window widens to "9–10 days after start" at daily cadence (could fire anywhere between 9.0 and 9.999 days in). Once on Pro and 5-min cadence, day-9 typically fires within 5 minutes of crossing the 9-day mark.
+**Note on Hobby limit accuracy:** Vercel docs state daily is the *minimum* cron interval on Hobby. Per-minute (including every 5 minutes) requires Pro at $20/month.
+
+## D16 — CC self on every trial email via CC_EMAIL env var
+
+**Choice:** A new `CC_EMAIL` env var (intended value: `lars.broden@lbconsultinggroup.org`) makes every trial email — both day-1 and day-9 — CC the configured address. Implementation lives entirely in `lib/graph.ts`: `sendMail` reads `env.ccEmail()` and adds `ccRecipients` to the Graph payload if set.
+**Reasoning:** Lars wants real-time inbox visibility into outreach without needing to check Vercel logs. CC self is the lightest-weight pattern that achieves this.
+**Safeguard:** if `CC_EMAIL` would equal the `toEmail` (a Lars-installed trial), the CC is dropped to avoid him CC'ing himself on a welcome addressed to himself.
+**Trade-off:** if Lars's inbox fills up during a high-volume period he can remove the env var without code changes — graceful degradation.
+
+## D17 — Drop watermark; always fetch a 30-day window (supersedes D11)
+
+**Choice (supersedes D11):** The Marketplace API fetch always uses `lastUpdated >= today - 30 days`. The Redis watermark key and the related earliest-failed-license bookkeeping are removed.
+**Reasoning:** The day-9 pass needs visibility into licenses that started 9–30 days ago. Keeping a watermark optimised for "newest only" complicated the orchestrator without commensurate benefit. A 30-day window per cron tick is trivial for a small vendor (~5–20 licenses returned per fetch, ~95 MB/year of API traffic at 5-min cadence — well within any free-tier limit). D11's concern (transient failures losing welcomes) is satisfied trivially now: every run refetches the 30-day window and per-license dedupe handles the rest.
+**Trade-off:** if license volume ever exceeds ~10K records per 30-day window, we'd need pagination tuning or a return to watermark-based incremental fetch.

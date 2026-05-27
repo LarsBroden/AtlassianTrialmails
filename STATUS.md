@@ -17,13 +17,16 @@ The code is built and tested. **Deployment is intentionally deferred** — Lars 
 | Marketplace API client | ✅ Built, untested against real API | Awaiting real `MARKETPLACE_API_TOKEN` for live verification |
 | Microsoft Graph sendMail | ✅ Built, untested against real tenant | Awaiting Azure app registration |
 | Upstash state (dedupe + watermark) | ✅ 7 unit tests via in-memory mock | Works locally without Upstash; falls back to in-memory |
-| Welcome email template | ✅ Designed, previewed in Outlook via `.eml` | [emails/welcome-preview.html](emails/welcome-preview.html) |
-| Daily cron endpoint | ✅ `/api/cron/welcome-trials` | Returns rich JSON summary with `rejectedByReason` |
+| Welcome (day-1) template | ✅ Lars-supplied HTML, dark hero, founder-as-PM voice | [emails/welcome-preview.html](emails/welcome-preview.html) |
+| Day-9 follow-up template | ✅ Lars-supplied HTML, check-in framing | [emails/day9-followup.html](emails/day9-followup.html) |
+| Cron endpoint (two-pass) | ✅ `/api/cron/welcome-trials` runs day-1 + day-9 in sequence | Returns split `day1`/`day9` summary JSON with `rejectedByReason` for each pass |
+| CC-self on every send | ✅ Driven by `CC_EMAIL` env var | [lib/graph.ts](lib/graph.ts) — skips CC if it equals the recipient |
+| 5-minute cron schedule | ✅ Set in `vercel.json` | Requires Vercel Pro to actually fire at this frequency; capped to daily on Hobby |
 | Forge lifecycle endpoint | ✅ Built but dormant | `/api/lifecycle/installed` — Option A scaffold, not wired (see [DECISIONS.md D6](DECISIONS.md)) |
 | Forge integration snippets | ✅ Ready to copy into Forge app repo | `bulk-clone-forge-snippets/` — used only when graduating to Option A |
 | Local Outlook preview tool | ✅ | [scripts/preview-in-outlook.ps1](scripts/preview-in-outlook.ps1) |
 | GitHub repo | ✅ Published | https://github.com/LarsSverkerBroden/Sales-Extract-from-Atlassian-Marketplace |
-| Tests | ✅ 48 passing | `npm test` |
+| Tests | ✅ 59 passing | `npm test` |
 | Production build | ✅ Clean | `npm run build` |
 
 ## Deployment checklist (deliberately not done)
@@ -36,13 +39,14 @@ These are the user-side actions in [SETUP.md](SETUP.md), to be done **only when 
 - [ ] DNS records on `lbconsultinggroup.org`: SPF, DKIM (enable in M365), DMARC
 - [ ] Upstash Redis database provisioned via Vercel Marketplace
 - [ ] `vercel link` to a new Vercel project
+- [ ] **Upgrade to Vercel Pro** if 5-minute polling is desired (Hobby caps cron at daily; the `*/5 * * * *` schedule sits in `vercel.json` ready for activation)
 - [ ] All env vars set in Vercel:
   - `MARKETPLACE_VENDOR_ID`, `MARKETPLACE_USER_EMAIL`, `MARKETPLACE_API_TOKEN`, `MARKETPLACE_APP_KEY`
   - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
   - `GRAPH_SENDER_USER_ID`, `GRAPH_REPLY_TO_EMAIL`
+  - `CC_EMAIL=lars.broden@lbconsultinggroup.org` (every welcome / day-9 email is CC'd here for inbox visibility)
   - `DRY_RUN=true` (initially)
   - `CRON_SECRET` (e.g. `openssl rand -hex 32`)
-  - `CALENDAR_URL`, `DOCS_URL`, `QUICKSTART_URL`
   - `NEW_TRIAL_LOOKBACK_DAYS=7`
 - [ ] First deploy: `npx vercel deploy --prod`
 - [ ] First manual dry-run: `curl "https://<project>.vercel.app/api/cron/welcome-trials?secret=$CRON_SECRET"`

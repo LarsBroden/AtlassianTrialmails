@@ -4,11 +4,22 @@ Small web app for LB Consulting Group's "Bulk Clone Professional for Jira" Marke
 
 ## What it does
 
-1. Upload the transactions CSV exported from the Atlassian Marketplace partner portal.
-2. Server parses the CSV, filters to Cloud licenses, and deduplicates technical + billing contact emails.
-3. UI shows transaction count, unique emails, hosting breakdown, and how many emails come from known partner / reseller domains.
-4. Filter toggles: exclude partner domains, choose status (active / inactive / all).
-5. Outputs: a semicolon-separated BCC string (one-click copy) and a downloadable CSV with FirstName, LastName, Email, Company, HostingType, Status, InstallDate, DisplayName.
+Two workflows in one repo:
+
+### 1. Manual CSV review-outreach (`/` UI)
+- Upload the transactions CSV exported from the Atlassian Marketplace partner portal.
+- Server parses the CSV, filters to Cloud licenses, and deduplicates technical + billing contact emails.
+- UI shows transaction count, unique emails, hosting breakdown, and how many emails come from known partner / reseller domains.
+- Filter toggles: exclude partner domains, choose status (active / inactive / all).
+- Outputs: a semicolon-separated BCC string (one-click copy) and a downloadable CSV with FirstName, LastName, Email, Company, HostingType, Status, InstallDate, DisplayName.
+
+### 2. Automated trial-welcome pipeline (cron → Microsoft Graph)
+- Vercel Cron polls the Marketplace REST API every 5 minutes (requires Pro tier — Hobby caps to daily).
+- Two emails per trial:
+  - **Day 1:** welcome email fires when a new EVALUATION license appears (filtered to genuine new Cloud prospects).
+  - **Day 9:** check-in email fires when the trial is 9 days old and the day-1 welcome was sent.
+- Sends from `lars.broden@lbconsultinggroup.org` via Microsoft Graph, CC'ing the same address for inbox visibility.
+- Templates are fully static HTML in `emails/welcome-preview.html` and `emails/day9-followup.html`.
 
 Cloud only — Data Center customers are handled in a separate workflow.
 

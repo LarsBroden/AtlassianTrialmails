@@ -51,25 +51,33 @@ export async function sendMail({ toEmail, toName, subject, html, text }: SendMai
   const token = await getAccessToken();
   const sender = env.graphSenderUserId();
   const replyTo = env.graphReplyToEmail() || sender;
+  const cc = env.ccEmail();
 
-  const payload = {
-    message: {
-      subject,
-      body: { contentType: "HTML", content: html },
-      toRecipients: [
-        { emailAddress: { address: toEmail, ...(toName ? { name: toName } : {}) } },
-      ],
-      replyTo: [{ emailAddress: { address: replyTo } }],
-      // Custom header so the recipient inbox shows a deterministic alt-text fallback.
-      // The actual plain-text alternative is composed by Graph from the HTML when
-      // contentType=HTML; we keep `text` as the source of truth for downstream
-      // logging/debugging.
-      internetMessageHeaders: [
-        { name: "X-Mailer", value: "bulk-clone-trial-mailer/1.0" },
-      ],
-    },
-    saveToSentItems: true,
+  const message: Record<string, unknown> = {
+    subject,
+    body: { contentType: "HTML", content: html },
+    toRecipients: [
+      { emailAddress: { address: toEmail, ...(toName ? { name: toName } : {}) } },
+    ],
+    replyTo: [{ emailAddress: { address: replyTo } }],
+    // Custom header so the recipient inbox shows a deterministic alt-text fallback.
+    // The actual plain-text alternative is composed by Graph from the HTML when
+    // contentType=HTML; we keep `text` as the source of truth for downstream
+    // logging/debugging.
+    internetMessageHeaders: [
+      { name: "X-Mailer", value: "bulk-clone-trial-mailer/1.0" },
+    ],
   };
+
+  // Optional CC (used to mirror every trial email to Lars's own inbox for
+  // observability). Skip the cc field entirely when CC_EMAIL is unset or when
+  // it would equal the recipient (avoid sending the recipient a copy of their
+  // own welcome).
+  if (cc && cc.toLowerCase() !== toEmail.toLowerCase()) {
+    message.ccRecipients = [{ emailAddress: { address: cc } }];
+  }
+
+  const payload = { message, saveToSentItems: true };
 
   const res = await fetch(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,

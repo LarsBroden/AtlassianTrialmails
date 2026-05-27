@@ -1,12 +1,17 @@
 # Setup — Trial Welcome Automation
 
-One-time setup to wire up the welcome email pipeline. Two layers:
+One-time setup to wire up the welcome + day-9 email pipeline.
 
-1. **Trigger-based (primary):** the Bulk Clone Professional Forge app fires its
-   `installed` lifecycle event when a Jira admin starts a trial. A 60s delayed
-   Forge queue then POSTs to a Vercel webhook, which sends the welcome email.
-   End-to-end latency: ~60–90 seconds from install to inbox.
-2. **Daily cron (safety net):** catches anything the trigger missed.
+**Two emails per trial:**
+- **Day 1:** fires on the next cron tick after a new EVALUATION license appears in the Marketplace REST API. Welcomes the trial user, links to docs / videos / migration guide / release notes / support portal.
+- **Day 9:** fires on the next cron tick after `maintenanceStartDate + 9 days <= today`, gated behind day-1 having been sent. Checks in, surfaces the same resources, asks if anything's blocked.
+
+**Cron cadence:**
+- `vercel.json` declares `*/5 * * * *` (every 5 minutes).
+- Vercel Hobby (free) silently caps cron at **daily** — the schedule still fires once per day until you're on Pro.
+- Vercel Pro ($20/month) allows the configured 5-min cadence to actually fire.
+
+**Every welcome / day-9 email is CC'd to your own inbox** (`CC_EMAIL` env var, intended value `lars.broden@lbconsultinggroup.org`) for real-time visibility into outreach.
 
 Estimated time: 30–40 minutes.
 
@@ -129,13 +134,11 @@ npx vercel env add AZURE_CLIENT_ID
 npx vercel env add AZURE_CLIENT_SECRET
 npx vercel env add GRAPH_SENDER_USER_ID
 npx vercel env add GRAPH_REPLY_TO_EMAIL
+npx vercel env add CC_EMAIL                       # value: lars.broden@lbconsultinggroup.org (CC self on every trial email)
 npx vercel env add DRY_RUN                        # value: true (flip to false later)
 npx vercel env add CRON_SECRET                    # value: long random string, e.g. `openssl rand -hex 32`
-npx vercel env add CALENDAR_URL                   # your Calendly link
-npx vercel env add DOCS_URL                       # docs link
-npx vercel env add QUICKSTART_URL                 # quickstart video link
-npx vercel env add NEW_TRIAL_LOOKBACK_DAYS        # value: 7 (only act on trials started in last N days)
-npx vercel env add FORGE_WEBHOOK_SECRET           # value: long random string (shared with the Forge app)
+npx vercel env add NEW_TRIAL_LOOKBACK_DAYS        # value: 7 (only act on day-1 trials started in last N days)
+npx vercel env add FORGE_WEBHOOK_SECRET           # value: long random string (shared with the Forge app, only used if you wire up the Forge trigger path)
 ```
 
 Then deploy:
@@ -143,7 +146,7 @@ Then deploy:
 npx vercel deploy --prod
 ```
 
-The cron runs daily at **09:00 UTC** (configured in `vercel.json`). Change the cron expression there if you want a different cadence (Pro plan supports down to per-minute).
+The cron is declared as `*/5 * * * *` in `vercel.json`. On Hobby it actually fires once per day; on Pro it fires every 5 minutes. Each tick runs day-1 + day-9 passes back-to-back.
 
 ---
 
@@ -156,25 +159,42 @@ With `DRY_RUN=true` set:
 curl "https://<your-project>.vercel.app/api/cron/welcome-trials?secret=$CRON_SECRET"
 ```
 
-Response is a JSON summary like:
+Response is a JSON summary split by pass:
 ```json
 {
   "dryRun": true,
   "fetched": 12,
-  "rejected": 9,
-  "rejectedByReason": {
-    "outside-lookback-window": 5,
-    "partner-domain": 2,
-    "atlassian-internal": 1,
-    "missing-company": 1
+  "day1": {
+    "considered": 12,
+    "rejected": 9,
+    "rejectedByReason": {
+      "outside-lookback-window": 5,
+      "partner-domain": 2,
+      "atlassian-internal": 1,
+      "missing-company": 1
+    },
+    "alreadySent": 0,
+    "attempted": 3,
+    "sent": 3,
+    "failed": 0
   },
-  "alreadySent": 0,
-  "attempted": 3,
-  "sent": 3,
-  "failed": 0,
+  "day9": {
+    "considered": 12,
+    "rejected": 10,
+    "rejectedByReason": {
+      "too-early": 5,
+      "no-day1-record": 4,
+      "too-old": 1
+    },
+    "alreadySent": 0,
+    "attempted": 2,
+    "sent": 2,
+    "failed": 0
+  },
   "results": [
-    { "licenseId": "SEN-L12345", "email": "sara@acme.com", "company": "Acme Corp", "status": "dry-run" },
-    { "licenseId": "SEN-L67890", "email": "qa@team.atlassian.com", "company": "Atlassian", "status": "rejected", "reason": "atlassian-internal" }
+    { "pass": "day1", "licenseId": "SEN-L12345", "email": "sara@acme.com", "company": "Acme Corp", "status": "dry-run" },
+    { "pass": "day1", "licenseId": "SEN-L67890", "email": "qa@team.atlassian.com", "company": "Atlassian", "status": "rejected", "reason": "atlassian-internal" },
+    { "pass": "day9", "licenseId": "SEN-L11111", "email": "bob@example.com", "company": "Example Co", "status": "dry-run" }
   ]
 }
 ```
@@ -196,12 +216,24 @@ The `rejectedByReason` breakdown is the key thing to inspect during dry-run. Pos
 | `already-sent` | We previously emailed this exact license ID |
 | `already-emailed` | This email already received a welcome for this app (different license) |
 
+**Day-9 pass — additional rejection reasons:**
+
+| Reason | Meaning |
+|---|---|
+| `too-early` | `maintenanceStartDate + 9 days` is still in the future |
+| `too-old` | Trial started > 30 days ago (avoid back-filling check-ins on old trials) |
+| `inactive` | Trial status is not `active` |
+| `trial-ended` | `maintenanceEndDate` is in the past |
+| `no-day1-record` | We never sent a day-1 welcome for this license (continuity gate) |
+
 In Vercel logs you'll see `[dry-run] would send welcome to sara@acme.com (license SEN-L12345, ...)` for each one. **No email is sent and the watermark is not advanced**, so you can run it as many times as you like.
 
-Preview the rendered email:
+Preview either email in your browser:
 ```
-https://<your-project>.vercel.app/api/debug/preview-template?firstName=Sara&company=Acme%20Corp&trialEndDate=2026-06-12
+https://<your-project>.vercel.app/api/debug/preview-template?template=day1
+https://<your-project>.vercel.app/api/debug/preview-template?template=day9
 ```
+(Defaults to `template=day1` if omitted. Append `&format=text` for the plain-text fallback or `&format=json` for the full payload.)
 
 When happy, flip `DRY_RUN=false` in Vercel env vars and redeploy. The next cron run (or next manual trigger) will actually send.
 

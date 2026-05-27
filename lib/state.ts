@@ -2,8 +2,8 @@ import { Redis } from "@upstash/redis";
 import { env } from "./env";
 
 const SENT_PREFIX = "trial:sent:";
+const DAY9_SENT_PREFIX = "trial:day9-sent:";
 const EMAIL_SENT_PREFIX = "trial:email-sent:";
-const WATERMARK_KEY = "trial:watermark";
 
 // Short TTL for an in-flight claim: long enough for a single sendMail call,
 // short enough that a crashed run releases the lock within minutes so the
@@ -83,14 +83,13 @@ export function __resetClientForTests(): void {
   client = null;
 }
 
+// ---------- Day-1 (welcome) primitives ----------
+
 export async function hasBeenSent(addonLicenseId: string): Promise<boolean> {
   const exists = await getClient().exists(SENT_PREFIX + addonLicenseId);
   return exists === 1;
 }
 
-// Atomically claim a license-id for sending. Returns true if we acquired the
-// lock, false if another run (or a prior successful send) already owns it.
-// The claim auto-expires after CLAIM_TTL_SECONDS to recover from crashes.
 export async function claimSendLock(addonLicenseId: string): Promise<boolean> {
   const result = await getClient().set(
     SENT_PREFIX + addonLicenseId,
@@ -100,7 +99,6 @@ export async function claimSendLock(addonLicenseId: string): Promise<boolean> {
   return result === "OK";
 }
 
-// Promote a claim to a permanent dedupe record after the send succeeds.
 export async function confirmSent(addonLicenseId: string): Promise<void> {
   await getClient().set(
     SENT_PREFIX + addonLicenseId,
@@ -108,10 +106,38 @@ export async function confirmSent(addonLicenseId: string): Promise<void> {
   );
 }
 
-// Release a claim so the license can be retried on the next run.
 export async function releaseSendLock(addonLicenseId: string): Promise<void> {
   await getClient().del(SENT_PREFIX + addonLicenseId);
 }
+
+// ---------- Day-9 (follow-up) primitives ----------
+
+export async function hasDay9BeenSent(addonLicenseId: string): Promise<boolean> {
+  const exists = await getClient().exists(DAY9_SENT_PREFIX + addonLicenseId);
+  return exists === 1;
+}
+
+export async function claimDay9Lock(addonLicenseId: string): Promise<boolean> {
+  const result = await getClient().set(
+    DAY9_SENT_PREFIX + addonLicenseId,
+    new Date().toISOString(),
+    { nx: true, ex: CLAIM_TTL_SECONDS }
+  );
+  return result === "OK";
+}
+
+export async function confirmDay9Sent(addonLicenseId: string): Promise<void> {
+  await getClient().set(
+    DAY9_SENT_PREFIX + addonLicenseId,
+    new Date().toISOString()
+  );
+}
+
+export async function releaseDay9Lock(addonLicenseId: string): Promise<void> {
+  await getClient().del(DAY9_SENT_PREFIX + addonLicenseId);
+}
+
+// ---------- Per-email cross-license dedupe ----------
 
 export async function hasEmailBeenSent(appKey: string, email: string): Promise<boolean> {
   if (!email) return false;
@@ -122,12 +148,4 @@ export async function hasEmailBeenSent(appKey: string, email: string): Promise<b
 export async function markEmailSent(appKey: string, email: string): Promise<void> {
   if (!email) return;
   await getClient().set(emailKey(appKey, email), new Date().toISOString());
-}
-
-export async function getWatermark(): Promise<string | null> {
-  return await getClient().get<string>(WATERMARK_KEY);
-}
-
-export async function setWatermark(iso: string): Promise<void> {
-  await getClient().set(WATERMARK_KEY, iso);
 }
