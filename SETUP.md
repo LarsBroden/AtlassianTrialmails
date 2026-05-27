@@ -207,9 +207,10 @@ The `rejectedByReason` breakdown is the key thing to inspect during dry-run. Pos
 | `not-cloud` | Hosting is Data Center / Server |
 | `inactive` | License status is not "active" |
 | `non-prospect-type` | OPEN_SOURCE / COMMUNITY / DEVELOPER / ACADEMIC / CLASSROOM / PERSONAL / STARTER |
-| `atlassian-internal` | Email is `@atlassian.com` or `*.atlassian.com` |
+| `atlassian-internal` | Email is `@atlassian.com`, `*.atlassian.com`, or `@bugcrowdninja.com` (Atlassian's bug bounty alias domain — researchers, not prospects) |
 | `partner-domain` | Email matches a known partner / reseller domain (adaptavist, eficode, etc — full list in `lib/partners.ts`) |
 | `missing-company` | Company field is blank (often signals a test / personal account) |
+| `non-prospect-company` | Company name matches a test/sandbox/internal pattern: contains `bugbounty`, `sandbox`, ends in `-test`, or ends in `-internal`. Catches Atlassian bug-bounty test tenants and obvious sandbox instances. |
 | `missing-email` | No technical or billing contact email on the license |
 | `missing-start-date` | `maintenanceStartDate` is blank or unparseable |
 | `outside-lookback-window` | License started more than `NEW_TRIAL_LOOKBACK_DAYS` ago (default 7) |

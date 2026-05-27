@@ -130,6 +130,59 @@ describe("classifyTrial — rejects non-prospects", () => {
     );
   });
 
+  it("rejects @bugcrowdninja.com bug-bounty researcher emails", () => {
+    expectRejected(
+      {
+        ...sampleRaw,
+        contactDetails: {
+          ...sampleRaw.contactDetails,
+          technicalContact: { name: "Researcher", email: "al88nsk+0x04@bugcrowdninja.com" },
+        },
+      },
+      "atlassian-internal"
+    );
+  });
+
+  it("rejects company names containing 'bugbounty'", () => {
+    expectRejected(
+      { ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company: "bugbounty-test-nishtha132" } },
+      "non-prospect-company"
+    );
+  });
+
+  it("rejects company names containing 'sandbox'", () => {
+    expectRejected(
+      { ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company: "jira-zoox-cmk-sandbox-1" } },
+      "non-prospect-company"
+    );
+  });
+
+  it("rejects company names ending in -test", () => {
+    expectRejected(
+      { ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company: "icars-test" } },
+      "non-prospect-company"
+    );
+  });
+
+  it("rejects company names ending in -internal", () => {
+    expectRejected(
+      { ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company: "cgm-internal" } },
+      "non-prospect-company"
+    );
+  });
+
+  it("does NOT reject company names like 'Testify' or 'Acme Tester' (no word boundary)", () => {
+    const cases = ["Testify", "Acme Tester", "TestCorp"];
+    for (const company of cases) {
+      const n = normalizeLicense({ ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company } })!;
+      const r = classifyTrial(n, OPTS);
+      // These should pass the non-prospect-company filter, even though they may
+      // pass or fail other checks — the point is `non-prospect-company` is NOT
+      // the rejection reason.
+      if (!r.ok) expect(r.reason).not.toBe("non-prospect-company");
+    }
+  });
+
   it("rejects licenses with no company name (likely test/personal account)", () => {
     expectRejected(
       { ...sampleRaw, contactDetails: { ...sampleRaw.contactDetails, company: "" } },

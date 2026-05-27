@@ -11,11 +11,40 @@ const NON_PROSPECT_LICENSE_TYPES = new Set([
   "STARTER",
 ]);
 
+// Atlassian-affiliated email domains we never want to email. Includes the
+// obvious @atlassian.com plus Bugcrowd's alias domain used by security
+// researchers in Atlassian's bug bounty program (they install Marketplace
+// apps to look for vulnerabilities — not prospects).
+const ATLASSIAN_AFFILIATED_DOMAINS = new Set<string>([
+  "atlassian.com",
+  "bugcrowdninja.com",
+]);
+
 function isAtlassianInternalEmail(email: string): boolean {
   const at = email.lastIndexOf("@");
   if (at < 0) return false;
   const domain = email.slice(at + 1).toLowerCase();
-  return domain === "atlassian.com" || domain.endsWith(".atlassian.com");
+  return (
+    ATLASSIAN_AFFILIATED_DOMAINS.has(domain) || domain.endsWith(".atlassian.com")
+  );
+}
+
+// Company-name patterns that indicate a test / sandbox / internal Jira tenant
+// rather than a real prospect. Tested case-insensitively against the company
+// field. Word-boundary anchors (^/-/$) keep false positives down so that real
+// company names like "Testify" or "Internal Plumbing" aren't accidentally
+// matched.
+const NON_PROSPECT_COMPANY_PATTERNS: ReadonlyArray<RegExp> = [
+  /bugbounty/i,
+  /sandbox/i,
+  /(^|-)test(-|$)/i,
+  /(^|-)internal(-|$)/i,
+];
+
+function isNonProspectCompany(company: string): boolean {
+  const trimmed = company.trim();
+  if (!trimmed) return false;
+  return NON_PROSPECT_COMPANY_PATTERNS.some((p) => p.test(trimmed));
 }
 
 export interface TrialLicense {
@@ -98,6 +127,7 @@ export type RejectReason =
   | "atlassian-internal"
   | "partner-domain"
   | "non-prospect-type"
+  | "non-prospect-company"
   | "missing-company"
   | "missing-email"
   | "missing-start-date"
@@ -131,6 +161,9 @@ export function classifyTrial(
   }
 
   if (!license.company.trim()) return { ok: false, reason: "missing-company" };
+  if (isNonProspectCompany(license.company)) {
+    return { ok: false, reason: "non-prospect-company" };
+  }
 
   if (!license.maintenanceStartDate) {
     return { ok: false, reason: "missing-start-date" };
